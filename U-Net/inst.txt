@@ -1,0 +1,12 @@
+First Class is DoubleConv which contains 2 conv layers, batchnorm, relu
+    - We'll keep the image size as it is by making the padding=1
+
+Second Class is Down which contains maxpooling and DoubleConv Class
+
+Third Class is UP which contains upsampling and DoubleConv Class 
+
+Forth Class is the UNet Class which contains
+    1- four downlaming layers
+    2- bottleneck layer
+    3- four upsampling layers
+    4- last layer which is 1*1 conv 
