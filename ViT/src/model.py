@@ -123,3 +123,33 @@ class ViTInputLayer(nn.Module):
         out = tokens + self.positional_embedding
         # output shape [B, N+1, D]
         return self.dropout(out)
+
+
+
+# Unlike batch normalization, which normalizes across a batch, 
+# Layer Normalization (LayerNorm) normalizes across the feature dimension for each individual example.
+class LayerNormalization(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        eps: float=1e-6
+    ):
+        super(LayerNormalization, self).__init__()
+        self.eps = eps
+        self.alpha = nn.Parameter(torch.ones(embed_dim)) # Multiplied
+        self.beta = nn.Parameter(torch.zeros(embed_dim)) # Added
+
+    def forward(self, x):
+        # LayerNorm standardizes values along the last axis (D), 
+        # keeping output shape the same.
+        # x shape -> [B, N+1, D]
+        # -1 for D which calculate mean and std for D (features)
+        # For every token, calculate the mean/std across its features
+        mean = x.mean(dim=-1, keepdim=True)
+        std = x.std(dim=-1, keepdim=True)
+
+        # output shape -> (B, N+1, D)
+        return self.alpha * (x - mean) / (std + self.eps) + self.beta
+
+
+
