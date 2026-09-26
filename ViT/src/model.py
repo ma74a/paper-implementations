@@ -87,9 +87,9 @@ class ViTInputLayer(nn.Module):
         # add one for cls token
         num_positions = num_patches + 1
 
-        # create learnable positional embedding
+        # create learnable positional encoding
         # shape of [1, 197, 768]
-        self.positional_embedding = nn.Parameter(
+        self.positional_encoding = nn.Parameter(
             torch.randn(1, num_positions, embedding_dim),
             requires_grad=True
         )
@@ -120,7 +120,7 @@ class ViTInputLayer(nn.Module):
         # output of this-> [8, 197, 768]
         tokens = torch.concat((cls_token, patch_embeddings), dim=1)
 
-        out = tokens + self.positional_embedding
+        out = tokens + self.positional_encoding
         # output shape [B, N+1, D]
         return self.dropout(out)
 
@@ -136,6 +136,7 @@ class LayerNormalization(nn.Module):
     ):
         super(LayerNormalization, self).__init__()
         self.eps = eps
+        # nn.Parameter → automatically requires_grad=True by default.
         self.alpha = nn.Parameter(torch.ones(embed_dim)) # Multiplied
         self.beta = nn.Parameter(torch.zeros(embed_dim)) # Added
 
