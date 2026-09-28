@@ -278,9 +278,9 @@ class EncoderBlock(nn.Module):
         self,
         embed_dim: int,
         num_heads: int,
+        dff_scale: int,
         attention_dropout_rate: float,
         ff_dropout_rate: float,
-        dff_scale: int
     ):
         super(EncoderBlock, self).__init__()
         # The attention and FFN are two different sublayers,
@@ -311,6 +311,35 @@ class EncoderBlock(nn.Module):
         x = residual_2 + x
 
         return x
+
+class Encoder(nn.Module):
+    def __init__(
+        self,
+        num_encoder_blocks: int,
+        embed_dim: int,
+        num_heads: int,
+        dff_scale: int,
+        attention_dropout_rate: float,
+        ff_dropout_rate: float,
+    ):
+        super(Encoder, self).__init__()
+        self.encoder_blocks = nn.ModuleList([
+            EncoderBlock(
+                embed_dim=embed_dim,
+                num_heads=num_heads,
+                dff_scale=dff_scale,
+                attention_dropout_rate=attention_dropout_rate,
+                ff_dropout_rate=ff_dropout_rate
+            )
+            for _ in range(num_encoder_blocks)
+        ])
+
+    def forward(self, x):
+        for module in self.encoder_blocks:
+            x = module(x)
+
+        return x
+        
 
 
 if __name__ == "__main__":
