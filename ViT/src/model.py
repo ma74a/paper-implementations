@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 class PatchCreation(nn.Module):
     def __init__(
@@ -154,3 +155,112 @@ class LayerNormalization(nn.Module):
 
 
 
+class MultiHeadAttention(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout_rate: float
+    ):
+        super(MultiHeadAttention, self).__init__()
+        # check if the embed_dim is divisable by num_heads 
+        assert embed_dim % num_heads == 0, "Embedding dimension must be divisible by number of heads."
+
+        self.num_heads = num_heads
+        # nums of embed_dim for each head (768 // 12 -> 64)
+        self.d_k = embed_dim // num_heads
+        # created a weighted linear for each q, k, v and ouput with dim -> [embed_dim embed_dim]
+        self.w_q = nn.Linear(in_features=embed_dim, out_features=embed_dim) # Query 
+        self.w_k = nn.Linear(in_features=embed_dim, out_features=embed_dim) # Key
+        self.w_v = nn.Linear(in_features=embed_dim, out_features=embed_dim) # Value
+        self.w_o = nn.Linear(in_features=embed_dim, out_features=embed_dim) # Output
+
+        self.attention_dropout = nn.Dropout(dropout_rate)
+        self.proj_dropout = nn.Dropout(dropout_rate)
+
+    # x shape -> [batch_size, num_tokens, embed_dim]
+    def split_heads(self, x):
+        batch_size, num_tokens, embed_dim = x.shape
+        # shape -> [batch_size, num_tokens, num_head, d_k]
+        # d_k is embed_dim // num_heads
+        x = x.view(batch_size, num_tokens, self.num_heads, self.d_k)
+        # then get the head before num_tokens so every token will deal with its d_k dim
+        # shape -> [batch_size, num_heads, num_tokens, d_k]
+        x = x.transpose(1, 2)
+
+        # shape -> [batch_size, num_heads, num_tokens, d_k]
+        return x
+
+    def scaled_dot_product_attention(self, Q, K, V, dropout=None):
+        # Q dim [batch_size, num_heads, num_tokens, d_k] is like K dim
+        # we need to transpose K to match Q dim so inner dim is equal
+        # K after transpose is [batch_size, num_heads, d_k, num_tokens] -> inner dim is (d_k, d_k) 
+        # K.transpose(-2, -1) -> [batch_size, num_heads, d_k, num_tokens]
+        # after matmul Each token gets a score against every other token
+        # output shape -> [batch_size, num_heads, num_tokens, num_tokens]
+        atten_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
+        # applying softmax dim=-1 is num_tokens
+        # output shape -> [batch_size, num_heads, num_tokens, num_tokens]
+        atten_probs = atten_scores.softmax(dim=-1)
+
+        if dropout:
+            atten_probs = dropout(atten_probs)
+
+        # shape -> [batch_size, num_heads, num_tokens, d_k]
+        atten_output = torch.matmul(atten_probs, V)
+
+        return atten_output
+
+    # x shape is -> [batch_size, num_heads, num_tokens, d_k]
+    # we want to be -> [batch_size, num_tokens, embed_dim]
+    def combine_heads(self, x):
+        batch_size, num_heads, num_tokens, d_k = x.shape
+        # transpose(2, 1) make it [batch_size, num_tokens, num_heads, d_k] -> swap num_tokens with num_heads
+        # view(batch_size, num_tokens, num_heads*d_k)
+        x = x.transpose(2, 1).contiguous().view(batch_size, num_tokens, num_heads*d_k)
+
+        return x
+
+
+
+    # q, k, v shape -> [batch_size, num_tokens, embed_dim]
+    def forward(self, q, k, v):
+
+        # create weighted matrix for q, k, v
+        # split the embed dim across heads
+        # # shape -> [batch_size, num_heads, num_tokens, d_k] for each one
+        Q = self.split_heads(self.w_q(q))
+        K = self.split_heads(self.w_k(k))
+        V = self.split_heads(self.w_v(v))
+
+
+        # applying self attention across q, k, v
+        # shape -> [batch_size, num_heads, num_tokens, d_k]
+        atten_output = self.scaled_dot_product_attention(
+            Q=Q,
+            K=K,
+            V=V,
+            dropout=self.attention_dropout
+        )
+
+        # combine_heads
+        # input -> [batch_size, num_heads, num_tokens, d_k]
+        # output -> [batch_size, num_tokens, embed_dim]
+        combined_heads = self.combine_heads(atten_output)
+
+        outputs = self.proj_dropout(self.w_o(combined_heads))
+
+        return outputs
+
+        
+
+
+if __name__ == "__main__":
+    x = torch.randn(
+        2,      # batch_size
+        197,    # num_tokens
+        768     # embedding_dimension
+    )
+    obj = MultiHeadAttention(768, 12, 0.5)
+
+    output = obj(x, x, x)
