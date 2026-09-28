@@ -373,7 +373,7 @@ class VisionTransformer(nn.Module):
             ff_dropout_rate=ff_dropout_rate
         )
         self.norm = nn.LayerNorm(embedding_dim)
-        self.head_classification = nn.Linear(in_features=embedding_dim, out_features=num_classes)
+        self.classification_head = nn.Linear(in_features=embedding_dim, out_features=num_classes)
 
     # shape of x -> [B, C, H, W]
     def forward(self, x):
@@ -390,7 +390,7 @@ class VisionTransformer(nn.Module):
         cls_token = x[:, 0]
 
         # shape [B, num_classes]
-        return self.head_classification(cls_token)
+        return self.classification_head(cls_token)
 
         
 
