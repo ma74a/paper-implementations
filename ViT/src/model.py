@@ -252,7 +252,65 @@ class MultiHeadAttention(nn.Module):
 
         return outputs
 
-        
+
+class FeedForwardLayer(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        dff_scale: int,
+        dropout_rate: float=0.1
+    ):
+        super(FeedForwardLayer, self).__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_features=d_model, out_features=dff_scale*d_model),
+            nn.GELU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(in_features=dff_scale*d_model, out_features=d_model),
+            nn.Dropout(dropout_rate)
+        )
+
+    def forward(self, x):
+        return self.mlp(x)
+
+
+class EncoderBlock(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        attention_dropout_rate: float,
+        ff_dropout_rate: float,
+        dff_scale: int
+    ):
+        super(EncoderBlock, self).__init__()
+        # The attention and FFN are two different sublayers,
+        # so they should have their own normalization parameters.
+        self.layer_norm_1 = LayerNormalization(embed_dim=embed_dim)
+        self.layer_norm_2 = LayerNormalization(embed_dim=embed_dim)
+        self.muliti_head_attention = MultiHeadAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dropout_rate=attention_dropout_rate
+        )
+        self.feed_forward_layer = FeedForwardLayer(
+            d_model=embed_dim,
+            dff_scale=dff_scale,
+            dropout_rate=ff_dropout_rate
+        )
+
+    def forward(self, x):
+        # First sublayer: Multi-Head Self-Attention
+        residual_1 = x
+        x = self.layer_norm_1(x)
+        x = self.muliti_head_attention(x, x, x)
+        x = residual_1 + x
+
+        # Second sublayer: Feed Forward Network
+        residual_2 = x
+        x = self.feed_forward_layer(self.layer_norm_2(x))
+        x = residual_2 + x
+
+        return x
 
 
 if __name__ == "__main__":
