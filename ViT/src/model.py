@@ -203,7 +203,7 @@ class MultiHeadAttention(nn.Module):
         # output shape -> [batch_size, num_heads, num_tokens, num_tokens]
         atten_probs = atten_scores.softmax(dim=-1)
 
-        if dropout:
+        if dropout is not None:
             atten_probs = dropout(atten_probs)
 
         # shape -> [batch_size, num_heads, num_tokens, d_k]
@@ -339,15 +339,73 @@ class Encoder(nn.Module):
             x = module(x)
 
         return x
+
+
+class VisionTransformer(nn.Module):
+    def __init__(
+        self,
+        num_classes: int,
+        input_channel: int,
+        image_size: int,
+        patch_size: int,
+        embedding_dim: int,
+        input_dropout_rate: float,
+        num_encoder_blocks: int,
+        num_heads: int,
+        dff_scale: int,
+        attention_dropout_rate: float,
+        ff_dropout_rate: float,
+    ):
+        super(VisionTransformer, self).__init__()
+        self.input_layer = ViTInputLayer(
+            input_channel=input_channel,
+            image_size=image_size,
+            patch_size=patch_size,
+            embedding_dim=embedding_dim,
+            dropout_rate=input_dropout_rate
+        )
+        self.encoder = Encoder(
+            num_encoder_blocks=num_encoder_blocks,
+            embed_dim=embedding_dim,
+            num_heads=num_heads,
+            dff_scale=dff_scale,
+            attention_dropout_rate=attention_dropout_rate,
+            ff_dropout_rate=ff_dropout_rate
+        )
+        self.norm = nn.LayerNorm(embedding_dim)
+        self.head_classification = nn.Linear(in_features=embedding_dim, out_features=num_classes)
+
+    # shape of x -> [B, C, H, W]
+    def forward(self, x):
+        # shape [B, N+1, D]
+        x = self.input_layer(x)
+
+        # shape [B, N+1, D]
+        x = self.encoder(x)
+
+        # applying norm
+        x = self.norm(x)
+        # take the class token only
+        # shape [B, D]
+        cls_token = x[:, 0]
+
+        # shape [B, num_classes]
+        return self.head_classification(cls_token)
+
         
 
 
 if __name__ == "__main__":
-    x = torch.randn(
-        2,      # batch_size
-        197,    # num_tokens
-        768     # embedding_dimension
+    x = torch.randn(8, 3, 224, 224)
+    model = VisionTransformer(
+        num_classes=10, input_channel=3, image_size=224, patch_size=16,
+        embedding_dim=768, input_dropout_rate=0.1, num_encoder_blocks=12,
+        num_heads=12, dff_scale=4, attention_dropout_rate=0.0, ff_dropout_rate=0.1,
     )
-    obj = MultiHeadAttention(768, 12, 0.5)
 
-    output = obj(x, x, x)
+    output = model(x)
+    print("small output:", output.shape)                     # [8, 10]
+    print("small params:", sum(p.numel() for p in model.parameters())) 
+    tokens = model.input_layer(x)
+    print(f"tokens: {tokens.shape}")
+
