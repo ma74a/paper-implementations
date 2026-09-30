@@ -1,7 +1,8 @@
 import torch
-from torchinfo import summary
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import v2
+from torchinfo import summary
 
 from omegaconf import DictConfig, OmegaConf
 import hydra
@@ -155,6 +156,24 @@ def main(cfg: DictConfig):
     log.info("--- Model Summary ---")
     log.info(summary(vit_model, input_data=test_input))
     log.info("--------------------")
+    
+    # Calculate the total number of training steps:
+    # one step is performed for each batch, so:
+    # total steps = number of epochs × number of batches per epoch
+    total_training_steps = cfg.train.epochs * len(train_loader)
+    # Use the first 23% of the total training steps as a warmup period.
+    # During warmup, the learning rate gradually increases to the target learning rate.
+    num_warpup_steps = int(0.23 * total_training_steps)
+    
+    optimizer = torch.optim.AdamW(
+        vit_model.parameters(),
+        lr=cfg.optimizer.lr,
+        betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
+        weight_decay=cfg.optimizer.weight_decay
+    )
+    criterion = nn.CrossEntropyLoss()
+    
+    
     
     
 if __name__ == "__main__":
