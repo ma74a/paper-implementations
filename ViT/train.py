@@ -1,11 +1,15 @@
 import torch
+from torchinfo import summary
 from torch.utils.data import DataLoader
 from torchvision.transforms import v2
 
 from omegaconf import DictConfig, OmegaConf
+import hydra
+from hydra.core.hydra_config import HydraConfig
 import logging
 import os
 import matplotlib.pyplot as plt
+import json
 
 from src import VisionTransformer,TomAndJerryDataset
 
@@ -39,8 +43,8 @@ val_transform = v2.Compose([
 
 
 def load_data(cfg: DictConfig):
-    train_path = cfg.train_dataset_path
-    val_path = cfg.val_dataset_path
+    train_path = cfg.train.train_dataset_path
+    val_path = cfg.train.val_dataset_path
     
     train_dataset = TomAndJerryDataset(
         data_dir=train_path,
@@ -52,10 +56,10 @@ def load_data(cfg: DictConfig):
     )
 
     train_loader = DataLoader(train_dataset,
-                                   batch_size=cfg.batch_size,
+                                   batch_size=cfg.train.batch_size,
                                    shuffle=True)
     val_loader = DataLoader(val_dataset,
-                                 batch_size=cfg.batch_size,
+                                 batch_size=cfg.train.batch_size,
                                  shuffle=False)
 
     return train_dataset, val_dataset, train_loader, val_loader
@@ -92,3 +96,66 @@ def saving_training_plots(history_df, lr, output_dir):
     plot_path = os.path.join(output_dir, "training_curves.png")
     fig.savefig(plot_path)
     log.info(f"Saved training plot to {plot_path}")
+    
+
+@hydra.main(config_path="configs", config_name="config", version_base=None)
+def main(cfg: DictConfig):
+    # print and log the active config and the Hydra output directory:
+    print(f"Current working directory: {os.getcwd()}")
+    output_dir = HydraConfig.get().runtime.output_dir
+    log.info(f"All artifacts will be saved in {output_dir}")
+    log.info(f"\n{OmegaConf.to_yaml(cfg)}")
+    
+    log.info("Dataset creation begin")
+    train_dataset, val_dataset, train_loader, val_loader = load_data(cfg=cfg)
+    num_classes = len(train_dataset.classes)
+    log.info("Dataset created")
+    
+    log.info(f"Dataset Classes and Corresponding Labels : {train_dataset.class_to_idx}")
+
+    try:
+        log.info("Verifying consistency between config and dataset...")
+        assert num_classes == cfg.model.num_classes, \
+            f"Mismatch: config expects {cfg.model.num_classes} classes, but dataset has {num_classes}."
+        log.info("✅ Verification successful.")
+
+    except AssertionError as e:
+        log.error(f"CONFIGURATION ERROR: {e}")
+        import sys
+        sys.exit(1)
+        
+    log.info("Storing the index vs label mapping for the Current Dataset")
+    idx_to_class = train_dataset.idx_to_class
+    mapping_save_path = os.path.join(output_dir, "mapping_saved_file.json")
+    with open(mapping_save_path, 'w+') as f:
+        json.dump(idx_to_class, f, indent=4)
+    log.info(f"Mapping saved at : {mapping_save_path}")
+    
+    log.info("Model Creation Begin")
+    vit_model = VisionTransformer(
+        num_classes=cfg.model.num_classes,
+        input_channel=cfg.model.in_channels,
+        image_size=cfg.model.img_size,
+        patch_size=cfg.model.patch_size,
+        embedding_dim=cfg.model.embed_dim,
+        input_dropout_rate=cfg.model.input_dropout_rate,
+        num_encoder_blocks=cfg.model.num_of_encoders,
+        num_heads=cfg.model.num_heads,
+        dff_scale=cfg.model.dff_scale_factor,
+        attention_dropout_rate=cfg.model.attention_dropout_rate,
+        ff_dropout_rate=cfg.model.ff_dropout_rate
+    )
+    test_input = torch.randn(
+        cfg.train.batch_size,
+        cfg.model.in_channels,
+        cfg.model.img_size,
+        cfg.model.img_size
+    )
+    # print(summary(vit_model, input_data=test_input))
+    log.info("--- Model Summary ---")
+    log.info(summary(vit_model, input_data=test_input))
+    log.info("--------------------")
+    
+    
+if __name__ == "__main__":
+    main()
