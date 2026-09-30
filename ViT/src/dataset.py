@@ -8,6 +8,7 @@ class TomAndJerryDataset(Dataset):
         self.transforms = transforms
 
         self.class_to_idx = {}
+        self.idx_to_class = {}
         self.classes = []
         self.images_path = []
         self.labels = []
@@ -19,6 +20,7 @@ class TomAndJerryDataset(Dataset):
             cls_dir = os.path.join(self.data_dir, cls_name)
             self.classes.append(cls_name)
             self.class_to_idx[cls_name] = label
+            self.idx_to_class[label] = cls_name
             for img in os.listdir(cls_dir):
                 if img.lower().endswith(('.jpg', '.png', '.jpeg')):
                     img_path = os.path.join(cls_dir, img)
