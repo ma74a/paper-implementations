@@ -4,7 +4,7 @@ defaults:
 
 model:
   in_channels: 3
-  num_classes: 6
+  num_classes: 4
   img_size: 224
   patch_size: 16
   num_of_encoders: 6
@@ -20,13 +20,13 @@ model:
 train:
   batch_size: 32
   epochs: 100
-  # train_dataset_path : 'dataset_path/tom_and_jerry/train'
-  # val_dataset_path : 'dataset_path/tom_and_jerry/val'
-  train_dataset_path : '/home/etman/Downloads/ViT_data/train'
-  val_dataset_path : '/home/etman/Downloads/ViT_data/val'
+  train_dataset_path : '/content/train'
+  val_dataset_path : '/content/val'
+  # train_dataset_path : '/home/etman/Downloads/ViT_data/train'
+  # val_dataset_path : '/home/etman/Downloads/ViT_data/val'
 
 optimizer:
   lr: 3e-4
   weight_decay : 0.1
-  beta1 : 0.9
-  beta2 : 0.999
+  beta1 : 0.9   # controls moving average of gradients
+  beta2 : 0.999 #  controls moving average of squared gradients
