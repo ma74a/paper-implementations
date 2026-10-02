@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import LambdaLR
 from torchvision.transforms import v2
 from torchinfo import summary
 
@@ -11,6 +12,9 @@ import logging
 import os
 import matplotlib.pyplot as plt
 import json
+import math
+import pandas as pd
+from tqdm import tqdm
 
 from src import VisionTransformer,TomAndJerryDataset
 
@@ -157,13 +161,61 @@ def main(cfg: DictConfig):
     log.info(summary(vit_model, input_data=test_input))
     log.info("--------------------")
     
+    
+    # get accuracy
+    def accuracy_fn(y_pred, y_true):
+        # y_pred shape -> [B, num_classes] this row logits from model
+        # y_true shape -> [num_classes] this ground truth class indices
+        # get the index of higher probs accros num_classes dim
+        preds = torch.argmax(y_pred, dim=1)
+        # compare preds and y_true and check how many matches
+        correct = (preds == y_true).sum().item()
+        
+        # divide by the number of samples here
+        acc = correct / y_true.size(0)
+        
+        return acc
+    
+    def lr_lambda(current_step: int):
+        """
+        Return the learning-rate multiplier for a linear-warmup and cosine-decay schedule.
+
+        This function is designed to be used with PyTorch's ``LambdaLR`` scheduler.
+        The returned value is multiplied by the optimizer's base learning rate.
+
+        The schedule has two phases:
+
+        1. Linear warmup:
+        The learning-rate multiplier increases linearly from 0.0 to 1.0.
+
+        2. Cosine decay:
+        The multiplier decreases from 1.0 to 0.0 following a half-cosine curve.
+
+        Args:
+            current_step (int):
+                Current optimizer step, not the current epoch.
+
+        Returns:
+            float:
+                Learning-rate multiplier in the range [0.0, 1.0].
+
+        Notes:
+            ``num_warmup_steps`` and ``total_training_steps`` are defined in the
+            enclosing scope.
+        """
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        
+        progress = float(current_step - num_warmup_steps) / float(max(1, total_training_steps - num_warmup_steps))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
+    
     # Calculate the total number of training steps:
     # one step is performed for each batch, so:
     # total steps = number of epochs × number of batches per epoch
     total_training_steps = cfg.train.epochs * len(train_loader)
     # Use the first 23% of the total training steps as a warmup period.
     # During warmup, the learning rate gradually increases to the target learning rate.
-    num_warpup_steps = int(0.23 * total_training_steps)
+    num_warmup_steps = int(0.23 * total_training_steps)
     
     optimizer = torch.optim.AdamW(
         vit_model.parameters(),
@@ -173,6 +225,100 @@ def main(cfg: DictConfig):
     )
     criterion = nn.CrossEntropyLoss()
     
+    # controls how the learning rate changes over time.
+    scheduler = LambdaLR(optimizer=optimizer, lr_lambda=lr_lambda)
+    
+    # training loop will be below this
+    log.info("MODEL TRAINING BEGINS...")
+    train_acc = []
+    train_loss = []
+    learning_rates = []
+    val_acc = []
+    val_loss = []
+    n_trains = len(train_loader)
+    n_vals = len(val_loader)
+    best_val_acc = 0
+    vit_model = vit_model.to(device=device)
+    for epoch in range(cfg.train.epochs):
+        vit_model.train()
+        train_loss_average = 0
+        train_accuracy_average = 0
+        for image, label in tqdm(train_loader):
+            image, label = image.to(device), label.to(device)
+            optimizer.zero_grad()
+            learning_rates.append(scheduler.get_last_lr()[0])
+            
+            pred_logits = vit_model(image)
+            loss = criterion(pred_logits, label)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(vit_model.parameters(), max_norm=1.0)
+            optimizer.step()
+            scheduler.step()
+            
+            train_loss_average += loss.item()
+            train_accuracy_average += accuracy_fn(y_pred=pred_logits, y_true=label)
+            
+        epoch_train_avg_loss = train_loss_average / n_trains
+        epoch_train_avg_acc = train_accuracy_average / n_trains
+        train_loss.append(epoch_train_avg_loss)
+        train_acc.append(epoch_train_avg_acc)
+        
+        # eval_code
+        val_loss_average = 0
+        val_accuracy_average = 0
+        vit_model.eval()
+        with torch.inference_mode():
+            for image, label in tqdm(val_loader):
+                image, label = image.to(device), label.to(device)
+                pred_logits = vit_model(image)
+                loss = criterion(pred_logits, label)
+                
+                val_loss_average += loss.item()
+                val_accuracy_average += accuracy_fn(y_pred=pred_logits, y_true=label)
+                
+            epoch_val_avg_loss = val_loss_average / n_vals
+            epoch_val_avg_acc = val_accuracy_average / n_vals
+            val_loss.append(epoch_val_avg_loss)
+            val_acc.append(epoch_val_avg_acc)
+            
+            print(
+                f"Epoch {epoch+1} | "
+                f"train_loss: {epoch_train_avg_loss:.4f} | train_accuracy: {epoch_train_avg_acc:.4f} | "
+                f"val_loss: {epoch_val_avg_loss:.4f} | val_accuracy: {epoch_val_avg_acc:.4f} | "
+                f"LR: {scheduler.get_last_lr()[0]:.6f}"
+            )
+            
+            log.info(f"Epoch {epoch+1} | "
+            f"train_loss: {epoch_train_avg_loss:.4f} | train_accuracy: {epoch_train_avg_acc:.4f} | "
+            f"val_loss: {epoch_val_avg_loss:.4f} | val_accuracy: {epoch_val_avg_acc:.4f} | "
+            f"LR: {scheduler.get_last_lr()[0]:.6f}")
+            
+            # storing model for inference at later point of time===== model checkpointing ====
+            if epoch_val_avg_acc > best_val_acc:
+                best_val_acc = epoch_val_avg_acc
+                model_path = os.path.join(output_dir, "best_model.pt")
+                torch.save(vit_model.state_dict(), model_path)
+                log.info(f"New best model saved to {model_path} , with accuracy : {best_val_acc}")
+                
+                
+    learning_rates.append(scheduler.get_last_lr()[0])
+
+    log.info("Storing the training artifacts detials")
+
+    data = list(zip(train_loss,train_acc,val_loss,val_acc))
+    df = pd.DataFrame(data,columns=['train loss','train acc','val loss','val acc'])
+    
+    csv_path = os.path.join(output_dir, "training_history.csv")
+    df.to_csv(csv_path,index_label="epoch")
+    log.info("WOrking on Training Plots...")
+    saving_training_plots(df,learning_rates,output_dir)
+    df = {'learning_rates_per_step':learning_rates}
+    df = pd.DataFrame(df)
+    csv_path = os.path.join(output_dir, "learning_rates_per_step.csv")
+    df.to_csv(csv_path,index_label="steps")
+
+    log.info(f"😎 Training Completed, details stored in {output_dir}")
+        
     
     
     
