@@ -12,14 +12,19 @@ dependencies = [
     "matplotlib>=3.10.9",
     "numpy>=2.2.6",
     "omegaconf>=2.3.1",
+    "pandas>=2.3.3",
     "pillow>=12.3.0",
     "torch>=2.14.0",
     "torchinfo>=1.8.0",
     "torchvision>=0.29.0",
+    "tqdm>=4.66.5",
 ]
 
 [project.scripts]
 vit = "vit:main"
+[tool.uv.build-backend]
+module-name = "src"
+module-root = ""
 
 [build-system]
 requires = ["uv_build>=0.12.15,<0.13.0"]
