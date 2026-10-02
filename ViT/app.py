@@ -17,9 +17,7 @@ val_transform = v2.Compose([
 ])
 
 
-# ============================================================
 # Paths
-# ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -44,9 +42,7 @@ CLASS_MAPPING_PATH = os.path.join(
 )
 
 
-# ============================================================
 # Device
-# ============================================================
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -56,16 +52,12 @@ else:
     device = torch.device("cpu")
 
 
-# ============================================================
 # Load configuration
-# ============================================================
 
 cfg = OmegaConf.load(CONFIG_PATH)
 
 
-# ============================================================
 # Load class mapping
-# ============================================================
 
 @st.cache_data
 def load_class_mapping():
@@ -73,9 +65,7 @@ def load_class_mapping():
         return json.load(f)
 
 
-# ============================================================
 # Load model
-# ============================================================
 
 @st.cache_resource
 def load_model():
@@ -108,9 +98,7 @@ def load_model():
     return model
 
 
-# ============================================================
 # Prediction
-# ============================================================
 
 def predict(image: Image.Image, model, class_to_index):
 
@@ -152,9 +140,7 @@ def predict(image: Image.Image, model, class_to_index):
     return predicted_class, confidence, probabilities
 
 
-# ============================================================
 # Streamlit UI
-# ============================================================
 
 st.set_page_config(
     page_title="ViT Image Classifier",
@@ -171,9 +157,7 @@ st.write(
 )
 
 
-# ============================================================
 # Sidebar
-# ============================================================
 
 st.sidebar.header("Model Information")
 
@@ -202,9 +186,7 @@ st.sidebar.write(
 )
 
 
-# ============================================================
 # Load model and classes
-# ============================================================
 
 try:
 
@@ -221,9 +203,7 @@ except FileNotFoundError as e:
     st.stop()
 
 
-# ============================================================
 # Upload image
-# ============================================================
 
 uploaded_file = st.file_uploader(
     "Upload an image",
