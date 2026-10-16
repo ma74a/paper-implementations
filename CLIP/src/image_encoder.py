@@ -46,6 +46,51 @@ class PatchEmbedding(nn.Module):
         return x
     
     
+class AddClassAndPositionEmbedding(nn.Module):
+    def __init__(
+        self,
+        num_patches: int = 196,
+        embedding_dim: int = 256,
+    ) -> None:
+        super().__init__()
+        # create a cls token which will be learnable
+        # will be of shape [1, 1, 768] to add to patch embedding
+        # CLS = learned representation useful for classification
+        self.cls_token = nn.Parameter(
+            torch.randn(1, 1, embedding_dim)
+        )
+        
+        # add one for cls token
+        num_positions = num_patches + 1
+
+        # create learnable positional encoding
+        # shape of [1, 197, 768]
+        self.positional_encoding = nn.Parameter(
+            torch.randn(1, num_positions, embedding_dim)
+        )
+        
+    def forward(self, patch_embed: torch.Tensor) -> torch.Tensor:
+        # x shape -> [B, N, D]
+        batch_size = patch_embed.shape[0]
+        
+        # expand the cls token to add batch_size
+        # from [1, 1, 768] to [batch_size, 1, 768]
+        cls_token = self.cls_token.expand(batch_size, -1, -1) # -1 mean to change this dim
+        
+        # we'll concatenate cls token with patch emb
+        # [B, N, D]
+        # B = batch
+        # N = number of tokens -> dim = 1
+        # D = embedding dimension
+        # cls_token ->     [8, 1, 768]
+        # patch_dim ->     [8, 196, 768]
+        # output of this-> [8, 197, 768]
+        tokens = torch.concat((cls_token, patch_embed), dim=1)
+        
+        # shape -> [B, N+1, D]
+        out = tokens + self.positional_encoding
+        
+        return out
 
 
             

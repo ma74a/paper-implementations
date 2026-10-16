@@ -1,1 +1,5 @@
-from .image_encoder import PatchEmbedding
+from .image_encoder import (
+    PatchEmbedding,
+    AddClassAndPositionEmbedding,
+    
+)
