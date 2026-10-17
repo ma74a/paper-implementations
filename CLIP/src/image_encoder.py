@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+import math
+
 class PatchEmbedding(nn.Module):
     def __init__(
         self,
@@ -93,4 +95,102 @@ class AddClassAndPositionEmbedding(nn.Module):
         return out
 
 
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(
+        self,
+        embedding_dim: int = 256,
+        num_heads: int = 8,
+        dropout_rate: float = 0.0,
+    ) -> None:
+        super().__init__()
+        # check if the embed_dim is divisable by num_heads 
+        assert embedding_dim % num_heads == 0, "Embedding dimension must be divisible by number of heads."
+        
+        self.num_heads = num_heads
+        
+        # embed_dim for each head
+        self.d_k = embedding_dim // num_heads
+        self.scale = math.sqrt(self.d_k)
+        
+        self.w_q = nn.Linear(in_features=embedding_dim, out_features=embedding_dim) # Query
+        self.w_k = nn.Linear(in_features=embedding_dim, out_features=embedding_dim) # Key
+        self.w_v = nn.Linear(in_features=embedding_dim, out_features=embedding_dim) # Value
+        self.w_o = nn.Linear(in_features=embedding_dim, out_features=embedding_dim) # Out
+        
+        self.attention_dropout = nn.Dropout(dropout_rate)
+        self.proj_dropout = nn.Dropout(dropout_rate)
+        
+    def split_heads(self, x: torch.Tensor) -> torch.Tensor:
+        batch_size, num_patches, embed_dim = x.shape
+        
+        # shape -> [B, N, num_heads, d_k]
+        # d_k is embed_dim // num_heads
+        x = x.view(batch_size, num_patches, self.num_heads, self.d_k)
+        
+        # we want the shape to be -> [B, num_heads, N, d_k]
+        # so we use transpose for that
+        x = x.transpose(1, 2)
+        
+        return x
+    
+    def scaled_dot_product_attention(
+        self,
+        Q: torch.Tensor,
+        K: torch.Tensor,
+        V: torch.Tensor,
+        dropout: float
+    ) -> torch.Tensor:
+        # Q shape -> [B, num_heads, N, d_k]
+        # K shape before transpose -> [B, num_heads, N, d_k]
+        # we want to transpose K shape to match Q shape to we apply matmul
+        # K after transpose -> [B, num_heads, d_k, N]
+        # output shape -> [B, num_heads, N, N]
+        atten_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.scale
+        # apply softmax in dim=-1 which is N -> num_patches
+        # shape -> [B, num_heads, N, N]
+        atten_probs = atten_scores.softmax(dim=-1)
+        
+        if dropout is not None:
+            atten_probs = dropout(atten_probs)
             
+        # apply matmul on atten_porbs with V
+        # atten_probs shape -> [B, num_heads, N, N]
+        # V shape -> [B, num_heads, N, d_k]
+        # output shape -> [B, num_heads, N, d_k]
+        atten_output = torch.matmul(atten_probs, V)
+        
+        return atten_output
+    
+    def combine_heads(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape -> [B, num_heads, N, d_k]
+        # we want to be -> [B, N, D]
+        batch_size, num_heads, num_patches, d_k = x.shape
+        x = x.transpose(2, 1).contiguous().view(batch_size, num_patches, num_heads*d_k)
+        
+        return x
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        
+        # create a weighted matrix for q, k, v using x
+        # split the q for heads
+        # shape before -> [B, N, D]
+        # shape after split -> [B, num_heads, N, d_k]
+        Q = self.split_heads(self.w_q(x))
+        K = self.split_heads(self.w_k(x))
+        V = self.split_heads(self.w_v(x))
+        
+        # applying self attention across q, k, v
+        # shape -> [batch_size, num_heads, num_tokens, d_k]
+        atten_output = self.scaled_dot_product_attention(
+            Q=Q,
+            K=K,
+            V=V,
+            dropout=self.attention_dropout
+        )
+        
+        comined_heads = self.combine_heads(atten_output)
+        
+        outputs = self.proj_dropout(self.w_o(comined_heads))
+        
+        # shape -> [B, N, D]
+        return outputs
