@@ -194,3 +194,30 @@ class MultiHeadSelfAttention(nn.Module):
         
         # shape -> [B, N, D]
         return outputs
+    
+    
+class MLP(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int=256,
+        dff_scale: int=4,
+        dropout_rate: float=0.1
+    ) -> None:
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_features=embed_dim, out_features=dff_scale*embed_dim),
+            nn.GELU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(in_features=dff_scale*embed_dim, out_features=embed_dim),
+            nn.Dropout(dropout_rate)
+        )
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape -> [B, N, 256]
+        # after first fc -> [B, N, 1024]
+        # after dropout -> [B, N, 1024]
+        # after gelu -> [B, N, 1024]
+        # after second fc -> [B, N, 256]
+        out = self.mlp(x)
+        
+        return out
