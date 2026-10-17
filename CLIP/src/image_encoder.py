@@ -56,7 +56,7 @@ class AddClassAndPositionEmbedding(nn.Module):
     ) -> None:
         super().__init__()
         # create a cls token which will be learnable
-        # will be of shape [1, 1, 768] to add to patch embedding
+        # will be of shape [1, 1, 256] to add to patch embedding
         # CLS = learned representation useful for classification
         self.cls_token = nn.Parameter(
             torch.randn(1, 1, embedding_dim)
@@ -66,7 +66,7 @@ class AddClassAndPositionEmbedding(nn.Module):
         num_positions = num_patches + 1
 
         # create learnable positional encoding
-        # shape of [1, 197, 768]
+        # shape of [1, 197, 256]
         self.positional_encoding = nn.Parameter(
             torch.randn(1, num_positions, embedding_dim)
         )
@@ -76,7 +76,7 @@ class AddClassAndPositionEmbedding(nn.Module):
         batch_size = patch_embed.shape[0]
         
         # expand the cls token to add batch_size
-        # from [1, 1, 768] to [batch_size, 1, 768]
+        # from [1, 1, 768] to [batch_size, 1, 256]
         cls_token = self.cls_token.expand(batch_size, -1, -1) # -1 mean to change this dim
         
         # we'll concatenate cls token with patch emb
@@ -84,9 +84,9 @@ class AddClassAndPositionEmbedding(nn.Module):
         # B = batch
         # N = number of tokens -> dim = 1
         # D = embedding dimension
-        # cls_token ->     [8, 1, 768]
-        # patch_dim ->     [8, 196, 768]
-        # output of this-> [8, 197, 768]
+        # cls_token ->     [8, 1, 256]
+        # patch_dim ->     [8, 196, 256]
+        # output of this-> [8, 197, 256]
         tokens = torch.concat((cls_token, patch_embed), dim=1)
         
         # shape -> [B, N+1, D]
@@ -138,7 +138,7 @@ class MultiHeadSelfAttention(nn.Module):
         Q: torch.Tensor,
         K: torch.Tensor,
         V: torch.Tensor,
-        dropout: float
+        dropout: nn.Dropout
     ) -> torch.Tensor:
         # Q shape -> [B, num_heads, N, d_k]
         # K shape before transpose -> [B, num_heads, N, d_k]
@@ -264,3 +264,75 @@ class EncoderBlock(nn.Module):
         # shape still -> [B, N, D]
         return x
         
+        
+class ViTEncoder(nn.Module):
+    def __init__(
+        self,
+        image_size: int = 224,
+        patch_size: int = 16,
+        in_channels: int = 3,
+        embedding_dim: int = 256,
+        num_heads: int = 8,
+        dff_scale: int = 4,
+        num_encoder_blocks: int = 6,
+        dropout: float = 0.1,
+        
+    ) -> None:
+        super().__init__()
+        # first patch embedding
+        self.patch_embedding = PatchEmbedding(
+            in_channels=in_channels,
+            image_size=image_size,
+            patch_size=patch_size,
+            embedding_dim=embedding_dim
+        )
+        
+        if image_size % patch_size != 0:
+            raise ValueError(
+                "image_size must be divisible by patch_size"
+            )
+        
+        # second postion and cls token
+        num_patches = (image_size // patch_size) ** 2
+        self.class_position_embedding = AddClassAndPositionEmbedding(
+            num_patches=num_patches,
+            embedding_dim=embedding_dim
+        )
+        
+        self.encoder_blocks = nn.ModuleList([
+            EncoderBlock(
+                embed_dim=embedding_dim,
+                num_heads=num_heads,
+                dff_scale=dff_scale,
+                dropout=dropout
+            )
+            for _ in range(num_encoder_blocks)
+        ])
+        
+        # 4. Normalize the final token representations.
+        self.norm = nn.LayerNorm(embedding_dim)
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape -> [B, C, H, W]
+        # apply patch embedding
+        # shape -> [B, N, D]
+        # print(f"image shape: {x.shape}")
+        x = self.patch_embedding(x)
+        # print(f"after patch embed: {x.shape}")
+        # apply postion and cls token
+        # shape -> [B, N+1, D]
+        x = self.class_position_embedding(x)
+        # print(f"after postion and cls token: {x.shape}")
+        
+        for block in self.encoder_blocks:
+            x = block(x)
+            
+        # x shape -> [B, N, D]
+        x = self.norm(x)
+        
+        # shape [B, D]
+        image_features = x[:,0,:]
+        # print(image_features.shape)
+            
+        return image_features
+    
