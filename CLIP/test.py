@@ -6,7 +6,8 @@ from src import (
     AddClassAndPositionEmbedding,
     MultiHeadSelfAttention,
     EncoderBlock,
-    ViTEncoder
+    ViTEncoder,
+    TextEmbedding
 )
 
 # test patch embedding
@@ -127,6 +128,20 @@ def test_encoder():
     assert torch.isfinite(image_features).all()
 
     print("ViT encoder test passed!")
+    
+def test_text_embedding():
+    model = TextEmbedding(
+        vocab_size=10_000,
+        context_length=77,
+        embedding_dim=256,
+    )
+
+    token_ids = torch.randint(low=0, high=10_000, size=(2, 5))
+    print(token_ids.shape)
+    output = model(token_ids)
+
+    print(output.shape)
+    # torch.Size([2, 5, 256])
 
     
 if __name__ == "__main__":
@@ -137,4 +152,5 @@ if __name__ == "__main__":
     # test_add_cls_positional()
     # test_attention()
     # test_encoderblock()
-    test_encoder()
+    # test_encoder()
+    test_text_embedding()
