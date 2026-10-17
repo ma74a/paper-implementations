@@ -3,7 +3,8 @@ import torch.nn as nn
 
 from src import (
     PatchEmbedding,
-    AddClassAndPositionEmbedding
+    AddClassAndPositionEmbedding,
+    MultiHeadSelfAttention
 )
 
 # test patch embedding
@@ -65,6 +66,23 @@ def test_add_cls_positional():
     print("CLS features:", cls_features.shape)
     print(f"F: {f.shape}")
     
+def test_attention():
+    attention = MultiHeadSelfAttention(
+        embedding_dim=256,
+        num_heads=8,
+    )
+
+    # Four images, each represented by 197 tokens.
+    x = torch.randn(4, 197, 256)
+
+    out = attention(x)
+
+    print("Input:", x.shape)
+    print("Output:", out.shape)
+
+    assert out.shape == x.shape
+    assert torch.isfinite(out).all()
+
     
     
 if __name__ == "__main__":
@@ -72,4 +90,5 @@ if __name__ == "__main__":
     # cls_token = nn.Parameter(torch.randn(1, 1, 256))
     # expanded = cls_token.expand(4, -1, -1)
     # print(expanded.shape)
-    test_add_cls_positional()
+    # test_add_cls_positional()
+    test_attention()
