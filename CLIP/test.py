@@ -4,7 +4,8 @@ import torch.nn as nn
 from src import (
     PatchEmbedding,
     AddClassAndPositionEmbedding,
-    MultiHeadSelfAttention
+    MultiHeadSelfAttention,
+    EncoderBlock
 )
 
 # test patch embedding
@@ -83,7 +84,34 @@ def test_attention():
     assert out.shape == x.shape
     assert torch.isfinite(out).all()
 
-    
+def test_encoderblock():
+    block = EncoderBlock(
+        embed_dim=256,
+        num_heads=8,
+        dff_scale=4,
+    )
+
+    # Four images, each with 197 tokens.
+    x = torch.randn(4, 197, 256, requires_grad=True)
+
+    # Test the forward pass.
+    out = block(x)
+
+    print("Input shape:", x.shape)
+    print("Output shape:", out.shape)
+
+    assert out.shape == (4, 197, 256)
+    assert torch.isfinite(out).all()
+
+    # Test that gradients flow through the block.
+    loss = out.square().mean()
+    loss.backward()
+
+    assert x.grad is not None
+    assert torch.isfinite(x.grad).all()
+
+    print("Forward pass and backward pass succeeded!")
+
     
 if __name__ == "__main__":
     # test_patch_embedding()
@@ -91,4 +119,5 @@ if __name__ == "__main__":
     # expanded = cls_token.expand(4, -1, -1)
     # print(expanded.shape)
     # test_add_cls_positional()
-    test_attention()
+    # test_attention()
+    test_encoderblock()
