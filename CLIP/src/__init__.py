@@ -4,5 +4,7 @@ from .image_encoder import (
     MultiHeadSelfAttention,
     EncoderBlock,
     ViTEncoder
-    
+)
+from .text_encoder import (
+    TextEmbedding
 )
