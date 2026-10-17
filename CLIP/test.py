@@ -5,7 +5,8 @@ from src import (
     PatchEmbedding,
     AddClassAndPositionEmbedding,
     MultiHeadSelfAttention,
-    EncoderBlock
+    EncoderBlock,
+    ViTEncoder
 )
 
 # test patch embedding
@@ -111,6 +112,21 @@ def test_encoderblock():
     assert torch.isfinite(x.grad).all()
 
     print("Forward pass and backward pass succeeded!")
+    
+def test_encoder():
+    
+    model = ViTEncoder()
+
+    images = torch.randn(4, 3, 224, 224)
+    image_features = model(images)
+
+    print("Input:", images.shape)
+    print("Output:", image_features.shape)
+
+    assert image_features.shape == (4, 256)
+    assert torch.isfinite(image_features).all()
+
+    print("ViT encoder test passed!")
 
     
 if __name__ == "__main__":
@@ -120,4 +136,5 @@ if __name__ == "__main__":
     # print(expanded.shape)
     # test_add_cls_positional()
     # test_attention()
-    test_encoderblock()
+    # test_encoderblock()
+    test_encoder()
