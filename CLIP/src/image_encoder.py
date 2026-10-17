@@ -221,3 +221,46 @@ class MLP(nn.Module):
         out = self.mlp(x)
         
         return out
+    
+    
+class EncoderBlock(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int=256,
+        num_heads: int=8,
+        dff_scale: int=4,
+        dropout: float=0.1
+    ) -> None:
+        super().__init__()
+        self.layer_norm1 = nn.LayerNorm(embed_dim)
+        self.atten = MultiHeadSelfAttention(
+            embedding_dim=embed_dim,
+            num_heads=num_heads,
+            dropout_rate=dropout
+        )
+        self.layer_norm2 = nn.LayerNorm(embed_dim)
+        self.mlp = MLP(
+            embed_dim=embed_dim,
+            dff_scale=dff_scale,
+            dropout_rate=dropout
+        )
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape -> [B, N, D]
+        # first apply layer norm before applying attention
+        # but first save one for residual
+        res1 = x
+        x = self.layer_norm1(x)
+        x = self.atten(x)
+        # add res
+        x = res1 + x
+        
+        res2 = x
+        # apply layer norm again before mlp
+        x = self.layer_norm2(x)
+        x = self.mlp(x)
+        x = res2 + x
+        
+        # shape still -> [B, N, D]
+        return x
+        
