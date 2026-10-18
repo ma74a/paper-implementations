@@ -3,7 +3,7 @@ from .image_encoder import (
     AddClassAndPositionEmbedding,
     MultiHeadSelfAttention,
     EncoderBlock,
-    ViTEncoder
+    ImageEncoder
 )
 from .text_encoder import (
     TextEmbedding
