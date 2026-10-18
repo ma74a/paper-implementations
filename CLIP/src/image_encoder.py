@@ -265,7 +265,7 @@ class EncoderBlock(nn.Module):
         return x
         
         
-class ViTEncoder(nn.Module):
+class ImageEncoder(nn.Module):
     def __init__(
         self,
         image_size: int = 224,
