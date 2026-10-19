@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from image_encoder import MultiHeadSelfAttention, MLP
+from .image_encoder import MultiHeadSelfAttention, MLP
 
 
 class TextEmbedding(nn.Module):
@@ -158,6 +158,8 @@ class TextEncoder(nn.Module):
 
         x = self.norm(x)
         
+        # x.shape = [batch_size, N, D]
+        # take features from the eot embedding (eot_token is the highest number in each sequence)
         # With causal attention only the EOS token has seen the whole sentence.
         # EOS has the highest token id in CLIP's tokenizer, so argmax finds it.
         # shape -> [B, D]

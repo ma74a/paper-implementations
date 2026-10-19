@@ -72,12 +72,12 @@ class CLIP(nn.Module):
         
         # then we normalize it for cosine similarity
         # normalize across embedd_dim 
-        features = F.normalize(features)
+        features = F.normalize(features, p=2, dim=-1)
         
         # shape -> [B, D]
         return features
     
-    def enocde_text(self, text: torch.Tensor) -> torch.Tensor:
+    def encode_text(self, text: torch.Tensor) -> torch.Tensor:
         # text shape -> [B, L]
         
         # shape -> [B, text_dim]
@@ -88,7 +88,7 @@ class CLIP(nn.Module):
         
         # then we normalize it for cosine similarity
         # normalize across embedd_dim 
-        features = F.normalize(features)
+        features = F.normalize(features, p=2, dim=-1)
         
         # shape -> [B, D]
         return features
@@ -103,7 +103,7 @@ class CLIP(nn.Module):
         # text shape -> [B, L]
         
         image_embedding = self.encode_image(image=image)
-        text_embedding = self.enocde_text(text=text)
+        text_embedding = self.encode_text(text=text)
         
         # clamp the temperature to max 100 for training stability
         logit_scale = self.logit_scale.clamp(max=math.log(100)).exp()

@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
 
-from src import (
+from src.model import (
     PatchEmbedding,
     AddClassAndPositionEmbedding,
     MultiHeadSelfAttention,
     EncoderBlock,
-    ViTEncoder,
-    TextEmbedding
+    ImageEncoder,
+    TextEmbedding,
 )
+from src import clip_contrastive_loss
 
 # test patch embedding
 def test_patch_embedding():
@@ -116,7 +117,7 @@ def test_encoderblock():
     
 def test_encoder():
     
-    model = ViTEncoder()
+    model = ImageEncoder()
 
     images = torch.randn(4, 3, 224, 224)
     image_features = model(images)
@@ -142,6 +143,24 @@ def test_text_embedding():
 
     print(output.shape)
     # torch.Size([2, 5, 256])
+    
+def test_loss_fn():
+    logits_per_image = torch.tensor([
+        [5.0, 1.0, 0.2],
+        [0.5, 4.0, 0.1],
+        [0.3, 0.8, 6.0],
+    ])
+
+    logits_per_text = logits_per_image.T
+
+    loss = clip_contrastive_loss(
+        logits_per_image,
+        logits_per_text,
+    )
+
+    print("Loss:", loss.item())
+    assert loss.ndim == 0
+    assert torch.isfinite(loss)
 
     
 if __name__ == "__main__":
@@ -153,4 +172,5 @@ if __name__ == "__main__":
     # test_attention()
     # test_encoderblock()
     # test_encoder()
-    test_text_embedding()
+    # test_text_embedding()
+    test_loss_fn()
