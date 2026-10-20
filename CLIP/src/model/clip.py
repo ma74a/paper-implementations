@@ -5,8 +5,8 @@ import numpy as np
 import math
 from typing import Tuple
 
-from image_encoder import ImageEncoder
-from text_encoder import TextEncoder
+from .image_encoder import ImageEncoder
+from .text_encoder import TextEncoder
 
 class CLIP(nn.Module):
     def __init__(
