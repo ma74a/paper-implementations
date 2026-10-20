@@ -8,3 +8,4 @@ from .image_encoder import (
 from .text_encoder import (
     TextEmbedding
 )
+from .clip import CLIP
