@@ -1,0 +1,62 @@
+# CLIP config: small-scale version of the setup in Radford et al. (2021)
+# "paper:" comments give the original value (Sec. 2.3-2.5, Tables 18-20)
+# Anything marked "deviation" is changed on purpose to fit ~1000 images on one GPU
+
+seed: 42
+
+data:
+  images_dir: /kaggle/working/flickr8k_1000/Images
+  captions_file: /kaggle/working/flickr8k_1000/captions.txt   # columns: image, caption
+  val_ratio: 0.15              # split by image name, never by caption row
+  num_workers: 2
+  image_size: 224             # paper: 224 (ViT-B/32 and ViT-B/16)
+  mean: [0.48145466, 0.4578275, 0.40821073]
+  std: [0.26862954, 0.26130258, 0.27577711]
+  # paper: a random square crop from resized images is the only augmentation
+  # option: random_crop | random_resized_crop (more augmentation, deviates from the paper)
+  train_augmentation: random_crop
+  crop_scale: [0.5, 1.0]      # only used by random_resized_crop
+
+tokenizer:
+  name: openai/clip-vit-base-patch32   # lower-cased BPE, same tokenizer family as the paper
+  context_length: 77          # paper: text length capped at 76 + SOS/EOS
+
+model:
+  embed_dim: 512              # paper: 512 (ViT-B/32, ViT-B/16)
+  image_encoder:
+    patch_size: 16            # paper: 32 (B/32) or 16 (B/16)
+    image_embed: 256                # paper: 768   (deviation: smaller model)
+    layers: 6                 # paper: 12    (deviation)
+    heads: 8                  # paper: 12    (deviation)
+  text_encoder:
+    vocab_size: 49408         # paper: Table 18
+    text_embed: 256                # paper: 512   (deviation)
+    layers: 6                 # paper: 12    (deviation)
+    heads: 8                  # paper: 8
+  dropout: 0.1                # not in the paper (no dropout there); helps on a tiny dataset
+  projection: linear_no_bias  # paper: linear projection only, no non-linear head
+
+loss:
+  temperature_init: 0.07      # paper: learnable, initialized to 0.07
+  logit_scale_max: 100.0      # paper: logits never scaled by more than 100
+
+optimizer:
+  name: adamw                 # paper: Adam with decoupled weight decay
+  lr: 3.0e-4                  # paper: 5e-4 at batch 32,768 (deviation: lower for batch 64)
+  betas: [0.9, 0.98]          # paper: beta2 = 0.98 for ViT
+  eps: 1.0e-6                 # paper: 1e-6 for ViT
+  weight_decay: 0.2           # paper: 0.2
+  no_decay_on_bias_norm_scale: true   # paper: no decay on gains and biases (also exclude logit_scale)
+
+scheduler:
+  name: cosine                # paper: cosine decay
+  warmup_steps: 100           # paper: 2000 iterations (deviation: total steps here are about 1,400)
+  min_lr_ratio: 0.0           # final lr = min_lr_ratio * base lr (0.0 = decay all the way to zero)
+  # total_steps is not stored here: it is computed as epochs * len(train_loader)
+
+training:
+  batch_size: 32              # paper: 32,768 (deviation; fewer negatives per batch)
+  epochs: 100                 # paper: 32 epochs over 400M pairs (deviation: tiny dataset, so more epochs)
+  mixed_precision: true       # paper: mixed precision
+  grad_clip_norm: 1.0         # not in the paper; safety for small-batch from-scratch training
+  save_path: models/clip_best.pt
