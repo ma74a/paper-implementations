@@ -43,8 +43,8 @@ def saving_training_plots(history_df, lr, output_dir):
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(1, 2, figsize=(12, 5))
  
-    ax[0].plot(history_df["train loss"], label="Train Loss")
-    ax[0].plot(history_df["val loss"], label="Validation Loss")
+    ax[0].plot(history_df["train_losses"], label="Train Loss")
+    ax[0].plot(history_df["val_losses"], label="Validation Loss")
     ax[0].set_title("Loss Curves")
     ax[0].set_xlabel("Epoch")
     ax[0].set_ylabel("Loss")
@@ -157,7 +157,7 @@ def main(cfg: DictConfig):
     log.info("--------------------------")
     
     
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         get_params_group(model=clip_model, weight_decay=cfg["optimizer"]["weight_decay"]),
         lr=cfg["optimizer"]["lr"],
         betas=cfg["optimizer"]["betas"],
@@ -221,6 +221,18 @@ def main(cfg: DictConfig):
                 
             epoch_val_avg_loss = val_loss_avg / n_vals
             val_losses.append(epoch_val_avg_loss)
+            
+            print(
+                f"\nEpoch {epoch+1} | "
+                f"train_loss: {epoch_train_avg_loss:.4f} | "
+                f"val_loss: {epoch_val_avg_loss:.4f} | "
+                f"LR: {scheduler.get_last_lr()[0]:.6f}"
+            )
+            
+            log.info(f"\nEpoch {epoch+1} | "
+            f"train_loss: {epoch_train_avg_loss:.4f} | "
+            f"val_loss: {epoch_val_avg_loss:.4f} | "
+            f"LR: {scheduler.get_last_lr()[0]:.6f}")
             
             if best_val_loss > epoch_val_avg_loss:
                 best_val_loss = epoch_val_avg_loss
