@@ -2,6 +2,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 from transformers import CLIPTokenizer
 
+from omegaconf import DictConfig
 import pandas as pd
 from typing import Tuple, List
 import random
@@ -47,20 +48,20 @@ def split_data(
     return train, val
 
 
-def get_data(tokenizer: CLIPTokenizer) -> Tuple[DataLoader, DataLoader]:
+def load_data(cfg: DictConfig, tokenizer: CLIPTokenizer) -> Tuple[DataLoader, DataLoader]:
     train_images, val_images = split_data("/home/etman/Downloads/flickr8k_1000/captions.txt")
     
     train_dataset = ImageTextDataset(
-        images_dir="/home/etman/Downloads/flickr8k_1000/Images",
-        caption_path="/home/etman/Downloads/flickr8k_1000/captions.txt",
+        images_dir=cfg["data"]["images_dir"],
+        caption_path=cfg["data"]["captions_file"],
         image_names=train_images,
         tokenizer=tokenizer,
         transforms=get_transforms(train=True),
         train=True
     )
     val_dataset = ImageTextDataset(
-        images_dir="/home/etman/Downloads/flickr8k_1000/Images",
-        caption_path="/home/etman/Downloads/flickr8k_1000/captions.txt",
+        images_dir=cfg["data"]["images_dir"],
+        caption_path=cfg["data"]["captions_file"],
         image_names=val_images,
         tokenizer=tokenizer,
         transforms=get_transforms(train=False),
@@ -68,14 +69,14 @@ def get_data(tokenizer: CLIPTokenizer) -> Tuple[DataLoader, DataLoader]:
     )
     
     train_loader = DataLoader(
-        train_dataset, batch_size=32, shuffle=True,
+        train_dataset, batch_size=cfg["training"]["batch_size"], shuffle=True,
         num_workers=4, drop_last=True,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=32, shuffle=False,
+        val_dataset, batch_size=cfg["training"]["batch_size"], shuffle=False,
         num_workers=4, drop_last=True,
     )
-    first_batch = next(iter(train_loader))
+    # first_batch = next(iter(train_loader))
     
     # images, encoded_texts = first_batch
     # print(images.shape)
