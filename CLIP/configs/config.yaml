@@ -5,10 +5,11 @@
 seed: 42
 
 data:
-  images_dir: /kaggle/working/flickr8k_1000/Images
-  captions_file: /kaggle/working/flickr8k_1000/captions.txt   # columns: image, caption
+  images_dir: "/home/etman/Downloads/flickr8k_1000/Images"
+  captions_file: "/home/etman/Downloads/flickr8k_1000/captions.txt"   # columns: image, caption
   val_ratio: 0.15              # split by image name, never by caption row
   num_workers: 2
+  in_channels: 3
   image_size: 224             # paper: 224 (ViT-B/32 and ViT-B/16)
   mean: [0.48145466, 0.4578275, 0.40821073]
   std: [0.26862954, 0.26130258, 0.27577711]
@@ -33,6 +34,7 @@ model:
     text_embed: 256                # paper: 512   (deviation)
     layers: 6                 # paper: 12    (deviation)
     heads: 8                  # paper: 8
+  dff_scale: 4
   dropout: 0.1                # not in the paper (no dropout there); helps on a tiny dataset
   projection: linear_no_bias  # paper: linear projection only, no non-linear head
 
@@ -56,7 +58,7 @@ scheduler:
 
 training:
   batch_size: 32              # paper: 32,768 (deviation; fewer negatives per batch)
-  epochs: 100                 # paper: 32 epochs over 400M pairs (deviation: tiny dataset, so more epochs)
+  epochs: 50                 # paper: 32 epochs over 400M pairs (deviation: tiny dataset, so more epochs)
   mixed_precision: true       # paper: mixed precision
   grad_clip_norm: 1.0         # not in the paper; safety for small-batch from-scratch training
   save_path: models/clip_best.pt
