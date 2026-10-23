@@ -4,9 +4,42 @@ import textwrap
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import os
+
 
 CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
+
+def saving_training_plots(history_df, lr, output_dir):
+    """
+    Save train vs. val loss and the learning rate curve.
+ 
+    Input : history_df with columns 'train loss' and 'val loss' (one row per epoch)
+            lr         list of learning rates, one value per training step
+            output_dir folder where training_curves.png is saved
+    Output : None
+    """
+    plt.style.use("seaborn-v0_8-whitegrid")
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+ 
+    ax[0].plot(history_df["train_losses"], label="Train Loss")
+    ax[0].plot(history_df["val_losses"], label="Validation Loss")
+    ax[0].set_title("Loss Curves")
+    ax[0].set_xlabel("Epoch")
+    ax[0].set_ylabel("Loss")
+    ax[0].legend()
+ 
+    ax[1].plot(lr, label="Learning rate per step")
+    ax[1].set_title("Learning Rate Curve")
+    ax[1].set_xlabel("Step")
+    ax[1].set_ylabel("Learning rate")
+    ax[1].legend()
+ 
+    fig.tight_layout()
+    plot_path = os.path.join(output_dir, "training_curves.png")
+    fig.savefig(plot_path, dpi=150)
+    plt.close(fig)  # free the figure so it doesn't pile up in memory or show twice
+    # log.info(f"Saved training plot to {plot_path}")
 
 
 def denormalize(
