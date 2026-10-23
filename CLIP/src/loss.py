@@ -11,8 +11,11 @@ def clip_contrastive_loss(
     batch_size = logits_per_image.shape[0]
     
     labels = torch.arange(batch_size, device=logits_per_image.device)
-    print(labels)
-    
+    # print(labels)
+    # Use both directions of cross-entropy. 
+    # Image-to-text alone would train images to rank texts, 
+    # but the symmetric term also trains texts to rank images.
+
     image_loss = F.cross_entropy(logits_per_image, labels)
     text_loss = F.cross_entropy(logits_per_text, labels)
     
