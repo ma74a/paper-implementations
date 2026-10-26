@@ -206,7 +206,7 @@ class MultiHeadAttention(nn.Module):
         if dropout is not None:
             atten_probs = dropout(atten_probs)
 
-        # shape -> [batch_size, num_heads, num_tokens, d_k]
+        # shape -> [batch_size, num_heads, num_tokens, num_tokens]
         atten_output = torch.matmul(atten_probs, V)
 
         return atten_output
