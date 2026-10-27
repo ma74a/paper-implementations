@@ -3,5 +3,7 @@ name = "segformer"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib>=3.10.9",
+    "torch>=2.14.1",
+    "torchaudio>=2.11.0",
+    "torchvision>=0.29.1",
 ]
