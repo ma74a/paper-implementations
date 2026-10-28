@@ -107,6 +107,7 @@ class EfficientSelfAttention(nn.Module):
         q = q.reshape(B, N, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
         
         # Apply Spatial Reduction for Key and Value if sr_ratio > 1
+        # The spatial reduction reduces the number of K/V tokens, not their embedding dimension.
         if self.sr_ratio > 1:
             # convert x back to be 2D spatial map
             # x [B, N, D] then -> [B, D, H, W] D also consider C no_channels
@@ -137,3 +138,63 @@ class EfficientSelfAttention(nn.Module):
         # x shape -> [B, N, D]
         return x
             
+            
+class MixFFN(nn.Module):
+    """
+    The key idea is that a standard Transformer feed-forward network processes each token independently.
+    SegFormer adds a depthwise convolution between its two linear projections, 
+    allowing the network to incorporate local spatial information.
+    3x3 Depthwise Convolution between two Linear layers
+    xout = MLP(GELU(Conv3×3 (MLP(xin )))) + xin 
+    """
+    def __init__(
+        self,
+        embed_dim: int,
+        mlp_ratio: int,
+        dropout_rate: float=0.0
+    ) -> None:
+        super().__init__()
+        hidden_dim = embed_dim * mlp_ratio
+        self.fc1 = nn.Linear(embed_dim, hidden_dim)
+        self.dwconv = nn.Conv2d(
+            hidden_dim,
+            hidden_dim,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            groups=hidden_dim
+        )
+        self.act = nn.GELU()
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc2 = nn.Linear(hidden_dim, embed_dim)
+        
+    def forward(
+        self,
+        x: torch.Tensor,
+        H: int,
+        W: int
+    ) -> torch.Tensor:
+        # x shape -> [B, N, D]
+        # first apply fc1
+        # before [B, N, D] after [B, N, new_D]
+        x = self.fc1(x)
+        B, N, new_D = x.shape
+        
+        # reshape it and convert it into 2D to pass it to conv layer
+        # first to be [B, new_D, N] then [B, new_D, H, W]
+        x = x.transpose(1, 2).reshape(B, new_D, H, W)
+        # Mix local spatial information without mixing channels.
+        x = self.dwconv(x)
+        # reshape it again to be [B, N, new_D]
+        x = x.flatten(2).transpose(1, 2)
+        
+        x = self.act(x)
+        x = self.dropout(x)
+        
+        # shape before [B, N, new_D]
+        # after [B, N, D]
+        x = self.fc2(x)
+        x = self.dropout(x)
+        
+        return x
+    
