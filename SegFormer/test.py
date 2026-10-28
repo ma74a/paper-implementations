@@ -3,6 +3,7 @@ import torch
 from src import (
     OverlapPatchEmbedding,
     EfficientSelfAttention,
+    MixFFN,
     
 )
 
@@ -48,8 +49,34 @@ def efficient_self_attn(patch_embed):
 
     assert tokens.shape == (2, 16384, 32)
     assert output.shape == (2, 16384, 32)
+    
+    
+def test_mixfnn():
+    mix_ffn = MixFFN(
+        embed_dim=32,
+        mlp_ratio=4,
+        dropout_rate=0.0,
+    )
+
+    tokens = torch.randn(2, 128 * 128, 32)
+
+    output = mix_ffn(
+        tokens,
+        H=128,
+        W=128,
+    )
+
+    print("Input tokens:", tokens.shape)
+    print("Output tokens:", output.shape)
+
+    assert output.shape == (2, 16384, 32)
+
 
 
 if __name__ == "__main__":
+    print("test overlap patch embedding: ")
     patch_embed = test_overlappatchembed()
+    print("\ntest efficient_self_attn: ")
     efficient_self_attn(patch_embed)
+    print("\ntest mix_fnn: ")
+    test_mixfnn()
