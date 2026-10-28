@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from timm.models.layers import DropPath
 
 from typing import Tuple
 
@@ -108,6 +109,8 @@ class EfficientSelfAttention(nn.Module):
         
         # Apply Spatial Reduction for Key and Value if sr_ratio > 1
         # The spatial reduction reduces the number of K/V tokens, not their embedding dimension.
+        # It controls how much the spatial dimensions are reduced
+        # before generating the Keys and Values for attention.
         if self.sr_ratio > 1:
             # convert x back to be 2D spatial map
             # x [B, N, D] then -> [B, D, H, W] D also consider C no_channels
@@ -198,3 +201,44 @@ class MixFFN(nn.Module):
         
         return x
     
+    
+class MiTTransformerBlock(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        sr_ratio: int,
+        mlp_ratio: int = 4,
+        dropout: float = 0.0,
+        drop_path: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self.norm_1 = nn.LayerNorm(embed_dim)
+        self.attn = EfficientSelfAttention(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            sr_ratio=sr_ratio,
+            attn_dropout=dropout,
+            proj_dropout=dropout
+        )
+        self.norm_2 = nn.LayerNorm(embed_dim)
+        self.mlp = MixFFN(
+            embed_dim=embed_dim,
+            mlp_ratio=mlp_ratio,
+            dropout_rate=dropout
+        )
+        self.drop_path = DropPath(drop_path)
+        
+    def forward(
+        self,
+        x: torch.Tensor,
+        H: int,
+        W: int
+    ) -> torch.Tensor:
+        # Sublayer 1: pre-norm attention + residual connection.
+        x = x + self.drop_path(self.attn(self.norm_1(x), H, W))
+        # Sublayer 2: pre-norm Mix-FFN + residual connection.
+        x = x + self.drop_path(self.mlp(self.norm_2(x), H, W))
+        
+        return x
+
