@@ -4,6 +4,7 @@ from src import (
     OverlapPatchEmbedding,
     EfficientSelfAttention,
     MixFFN,
+    MiTTransformerBlock,
     
 )
 
@@ -70,6 +71,33 @@ def test_mixfnn():
     print("Output tokens:", output.shape)
 
     assert output.shape == (2, 16384, 32)
+    
+
+def test_mit_block(patch_embed):
+    block = MiTTransformerBlock(
+        embed_dim=32,
+        num_heads=1,
+        sr_ratio=8,
+        mlp_ratio=4,
+        dropout=0.0,
+        drop_path=0.0,
+    )
+
+    # Generate tokens from an input image.
+    image = torch.randn(2, 3, 512, 512)
+    tokens, height, width = patch_embed(image)
+
+    # Run the Transformer block.
+    block.eval()
+
+    with torch.no_grad():
+        output = block(tokens, height, width)
+
+    print("Input:", tokens.shape)
+    print("Output:", output.shape)
+
+    assert output.shape == tokens.shape
+
 
 
 
@@ -80,3 +108,5 @@ if __name__ == "__main__":
     efficient_self_attn(patch_embed)
     print("\ntest mix_fnn: ")
     test_mixfnn()
+    print("\nTest mix transformer block: ")
+    test_mit_block(patch_embed)
