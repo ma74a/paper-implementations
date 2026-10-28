@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 
-class OverlapPatchEmbeddings(nn.Module):
+class OverlapPatchEmbedding(nn.Module):
     """
+    Converts an image or feature map into a sequence of tokens that the Transformer can process.
     Overlapping Patch Merging layer used at the start of each MiT stage.
     Downsamples spatial resolution while increasing channel capacity.
     The output of this is sequence of tokens not 2D feature map
@@ -30,21 +31,23 @@ class OverlapPatchEmbeddings(nn.Module):
         # x shape -> [B, C, H, W]
         # apply conv layer shape -> [B, embed_dim, new_H, new_W]
         x = self.conv(x)
+        B, C, H, W = x.shape
         
         # then flatten the x across the new_H, new_W dims
         # the shape [B, embed_dim, new_H*new_W]
         x = x.flatten(start_dim=2)
         
+        # Each token represents one spatial location, described by a D-dimensional feature vector.
         # then traspose embed_dim with flatten_dim which is N (num_tokens)
         # shape -> [B, N, D]
         x = x.transpose(1, 2)
         
-        return x
+        return x, H, W
         
         
 if __name__ == "__main__":
     # x = torch.randn(4, 3, 512, 512)
-    # model = OverlapPatchEmbeddings(3, 128, 7, 4, 3)
+    # model = OverlapPatchEmbeddings(3, 32, 7, 4, 3)
     # out = model(x)
     # print(out.shape)
     pass
