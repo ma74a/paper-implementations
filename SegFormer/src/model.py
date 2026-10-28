@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 
+from typing import Tuple
+
 class OverlapPatchEmbedding(nn.Module):
     """
     Converts an image or feature map into a sequence of tokens that the Transformer can process.
     Overlapping Patch Merging layer used at the start of each MiT stage.
     Downsamples spatial resolution while increasing channel capacity.
     The output of this is sequence of tokens not 2D feature map
+    This will be reused for all four encoder stages, but with different configs
     """
     def __init__(
         self,
@@ -27,7 +30,7 @@ class OverlapPatchEmbedding(nn.Module):
         
         self.layer_norm = nn.LayerNorm(embed_dim)
         
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, int, int]:
         # x shape -> [B, C, H, W]
         # apply conv layer shape -> [B, embed_dim, new_H, new_W]
         x = self.conv(x)
@@ -45,9 +48,92 @@ class OverlapPatchEmbedding(nn.Module):
         return x, H, W
         
         
-if __name__ == "__main__":
-    # x = torch.randn(4, 3, 512, 512)
-    # model = OverlapPatchEmbeddings(3, 32, 7, 4, 3)
-    # out = model(x)
-    # print(out.shape)
-    pass
+class EfficientSelfAttention(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        sr_ratio: int,
+        attn_dropout: float=0.0,
+        proj_dropout: float=0.0
+    ) -> None:
+        super().__init__()
+        assert embed_dim % num_heads == 0, f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})."
+        
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.sr_ratio = sr_ratio
+        
+        # Queries are computed from every input token.
+        self.q = nn.Linear(embed_dim, embed_dim)
+        # key and value togther but we'll split them later
+        self.kv = nn.Linear(embed_dim, embed_dim * 2)
+        self.attn_drop = nn.Dropout(attn_dropout)
+        self.proj = nn.Linear(embed_dim, embed_dim)
+        self.proj_drop = nn.Dropout(proj_dropout)
+        
+        # Spatial reduction via Conv2d with kernel_size = stride = sr_ratio
+        # Spatially reduce the feature map before computing K and V.
+        if sr_ratio > 1:
+            self.sr = nn.Conv2d(
+                embed_dim,
+                embed_dim,
+                kernel_size=sr_ratio,
+                stride=sr_ratio
+            )
+            self.norm = nn.LayerNorm(embed_dim)
+            
+    def forward(
+        self,
+        x: torch.Tensor,
+        H: int,
+        W: int
+    ) -> torch.Tensor:
+        # x shape -> [B, N, D]
+        B, N, D = x.shape
+        if N != H * W:
+            raise ValueError("Token count must equal height * width.")
+        
+        # compute query
+        # convert form [B, N, D] -> [B, N, num_heads, head_dim] then 
+        # become [B, hum_heads, N, head_dim]
+        # x [B, N, D]
+        # q [D, D]
+        # q [B, N, D]
+        q = self.q(x)
+        # we can use transpose instead of permute transpose(1, 2)
+        q = q.reshape(B, N, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        
+        # Apply Spatial Reduction for Key and Value if sr_ratio > 1
+        if self.sr_ratio > 1:
+            # convert x back to be 2D spatial map
+            # x [B, N, D] then -> [B, D, H, W] D also consider C no_channels
+            x_2d = x.permute(0, 2, 1).reshape(B, D, H, W)
+            # then reduece spatial dimenions to [B, D, H/sr, W/sr]
+            x_reduced = self.sr(x_2d)
+            # then conver this into seq of tokens as before
+            # convert it from [B, D, H/sr, W/sr] -> [B, D, H/sr*W/sr] -> [B, N_reduced, D]
+            x_reduced = x_reduced.reshape(B, D, -1).permute(0, 2, 1)
+            # apply norm
+            x_reduced = self.norm(x_reduced)
+            kv = self.kv(x_reduced).reshape(B, -1, 2, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        else:
+            kv = self.kv(x).reshape(B, N, 2, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+            
+        # each one has [B, num_heads, N_reduced, head_dim]
+        k, v = kv[0], kv[1]
+        
+        # Attention score matrix: [B, num_heads, N, N_reduced]
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        
+        # Aggregate Values: [B, num_heads, N, head_dim] -> [B, N, D]
+        x = (attn @ v).transpose(1, 2).reshape(B, N, D)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        # x shape -> [B, N, D]
+        return x
+            
