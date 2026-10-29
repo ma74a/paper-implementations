@@ -3,5 +3,6 @@ from .model import (
     EfficientSelfAttention,
     MixFFN,
     MiTTransformerBlock,
+    MixVisionTransformer,
     
 ) 

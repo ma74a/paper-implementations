@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from timm.models.layers import DropPath
 
-from typing import Tuple
+from typing import Tuple, Sequence, List
 
 class OverlapPatchEmbedding(nn.Module):
     """
@@ -45,6 +45,7 @@ class OverlapPatchEmbedding(nn.Module):
         # then traspose embed_dim with flatten_dim which is N (num_tokens)
         # shape -> [B, N, D]
         x = x.transpose(1, 2)
+        x = self.layer_norm(x)
         
         return x, H, W
         
@@ -240,5 +241,177 @@ class MiTTransformerBlock(nn.Module):
         # Sublayer 2: pre-norm Mix-FFN + residual connection.
         x = x + self.drop_path(self.mlp(self.norm_2(x), H, W))
         
+        # shape -> [B, N, D]
         return x
+    
+    
 
+class MixVisionTransformer(nn.Module):
+    """
+    MiT encoder: 4 stages of [OverlapPatchEmbedding -> L x MiTTransformerBlock -> LayerNorm].
+    Returns the four stage outputs as 2D feature maps at strides 4, 8, 16, 32.
+    each stage downsamples the spatial resolution while increasing the number of channels.
+    Multiple Transformer blocks: each stage repeatedly refines its token representations.
+    Multi-scale outputs: the encoder saves all four feature maps for the decoder
+    """
+    def __init__(
+        self,
+        in_channels: int=3,
+        embed_dims: Sequence[int]=(32, 64, 160, 256),
+        depths: Sequence[int]=(2, 2, 2, 2),
+        num_heads: Sequence[int]=(1, 2, 5, 8),
+        sr_ratios: Sequence[int]=(8, 4, 2, 1),
+        mlp_ratios: Sequence[int]=(4, 4, 4, 4),
+        patch_kernels: Sequence[int]=(7, 3, 3, 3),
+        patch_strides: Sequence[int]=(4, 2, 2, 2),
+        patch_paddings: Sequence[int]=(3, 1, 1, 1),
+        dropout: float = 0.0,
+        drop_path_rate: float = 0.1,
+    ) -> None:
+        super().__init__()
+        self.num_stages = len(depths)
+        
+        # four patch embedding for each 4 stages
+        self.patch_embedding_1 = OverlapPatchEmbedding(
+            in_channels=in_channels,
+            embed_dim=embed_dims[0],
+            kernel_size=patch_kernels[0],
+            stride=patch_strides[0],
+            padding=patch_paddings[0]
+        )
+        self.patch_embedding_2 = OverlapPatchEmbedding(
+            in_channels=embed_dims[0],
+            embed_dim=embed_dims[1],
+            kernel_size=patch_kernels[1],
+            stride=patch_strides[1],
+            padding=patch_paddings[1]
+        )
+        self.patch_embedding_3 = OverlapPatchEmbedding(
+            in_channels=embed_dims[1],
+            embed_dim=embed_dims[2],
+            kernel_size=patch_kernels[2],
+            stride=patch_strides[2],
+            padding=patch_paddings[2]
+        )
+        self.patch_embedding_4 = OverlapPatchEmbedding(
+            in_channels=embed_dims[2],
+            embed_dim=embed_dims[3],
+            kernel_size=patch_kernels[3],
+            stride=patch_strides[3],
+            padding=patch_paddings[3]
+        )
+        
+        # Stochastic depth rate grows linearly from 0 to drop_path_rate across ALL blocks.
+        dpr = torch.linspace(0, drop_path_rate, sum(depths)).tolist() # stochastic depth decay rule
+        cur = 0
+        self.block_1 = nn.ModuleList([
+            MiTTransformerBlock(
+                embed_dim=embed_dims[0],
+                num_heads=num_heads[0],
+                sr_ratio=sr_ratios[0],
+                mlp_ratio=mlp_ratios[0],
+                dropout=dropout,
+                drop_path=dpr[cur+i]
+            )
+            for i in range(depths[0])
+        ])
+        self.norm_1 = nn.LayerNorm(embed_dims[0])
+        
+        cur += depths[0]
+        self.block_2 = nn.ModuleList([
+            MiTTransformerBlock(
+            embed_dim=embed_dims[1],
+            num_heads=num_heads[1],
+            sr_ratio=sr_ratios[1],
+            mlp_ratio=mlp_ratios[1],
+            dropout=dropout,
+            drop_path=dpr[cur+i]
+        )
+            for i in range(depths[1])
+        ])
+        self.norm_2 = nn.LayerNorm(embed_dims[1])
+        
+        cur += depths[1]
+        self.block_3 = nn.ModuleList([
+            MiTTransformerBlock(
+            embed_dim=embed_dims[2],
+            num_heads=num_heads[2],
+            sr_ratio=sr_ratios[2],
+            mlp_ratio=mlp_ratios[2],
+            dropout=dropout,
+            drop_path=dpr[cur+i]
+        )
+            for i in range(depths[2])
+        ])
+        self.norm_3 = nn.LayerNorm(embed_dims[2])
+        
+        cur += depths[2]
+        self.block_4 = nn.ModuleList([
+            MiTTransformerBlock(
+            embed_dim=embed_dims[3],
+            num_heads=num_heads[3],
+            sr_ratio=sr_ratios[3],
+            mlp_ratio=mlp_ratios[3],
+            dropout=dropout,
+            drop_path=dpr[cur+i]
+        )
+            for i in range(depths[3])
+        ])
+        self.norm_4 = nn.LayerNorm(embed_dims[3])
+        
+        
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
+        # x shape -> [B, C, H, W]
+        B, *_ = x.shape
+        outs = []
+        
+        # stage1 
+        x, H, W = self.patch_embedding_1(x)
+        for i, blk in enumerate(self.block_1):
+            x = blk(x, H, W)
+        # shape -> [B, N, D]
+        x = self.norm_1(x)
+        # we want the shape to be [B, C, H, W]
+        # tokens back to a 2D map: [B, N, D] -> [B, D, H, W].
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+        
+        # stage2 
+        x, H, W = self.patch_embedding_2(x)
+        for i, blk in enumerate(self.block_2):
+            x = blk(x, H, W)
+        # shape -> [B, N, D]
+        x = self.norm_2(x)
+        # we want the shape to be [B, C, H, W]
+        # tokens back to a 2D map: [B, N, D] -> [B, D, H, W].
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+        
+        
+        # stage3 
+        x, H, W = self.patch_embedding_3(x)
+        for i, blk in enumerate(self.block_3):
+            x = blk(x, H, W)
+        # shape -> [B, N, D]
+        x = self.norm_3(x)
+        # we want the shape to be [B, C, H, W]
+        # tokens back to a 2D map: [B, N, D] -> [B, D, H, W].
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+        
+        
+        # stage4
+        x, H, W = self.patch_embedding_4(x)
+        for i, blk in enumerate(self.block_4):
+            x = blk(x, H, W)
+        # shape -> [B, N, D]
+        x = self.norm_4(x)
+        # we want the shape to be [B, C, H, W]
+        # tokens back to a 2D map: [B, N, D] -> [B, D, H, W].
+        x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
+        outs.append(x)
+        
+        return outs
+        
+        
+        
