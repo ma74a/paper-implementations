@@ -5,6 +5,7 @@ from src import (
     EfficientSelfAttention,
     MixFFN,
     MiTTransformerBlock,
+    MixVisionTransformer,
     
 )
 
@@ -97,6 +98,29 @@ def test_mit_block(patch_embed):
     print("Output:", output.shape)
 
     assert output.shape == tokens.shape
+    
+def test_mix_vision_transformer():
+    encoder = MixVisionTransformer(
+        drop_path_rate=0.1,
+    )
+
+    encoder.eval()
+
+    image = torch.randn(1, 3, 512, 512)
+
+    with torch.no_grad():
+        features = encoder(image)
+
+    for stage_index, feature in enumerate(features, start=1):
+        print(f"Stage {stage_index}: {feature.shape}")
+
+    # assert [tuple(f.shape) for f in features] == [
+    #     (1, 32, 32, 32),
+    #     (1, 64, 16, 16),
+    #     (1, 160, 8, 8),
+    #     (1, 256, 4, 4),
+    # ]
+
 
 
 
@@ -110,3 +134,5 @@ if __name__ == "__main__":
     test_mixfnn()
     print("\nTest mix transformer block: ")
     test_mit_block(patch_embed)
+    print("\n Test test_mix_vision_transformer: ")
+    test_mix_vision_transformer()
