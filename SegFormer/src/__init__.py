@@ -4,5 +4,6 @@ from .model import (
     MixFFN,
     MiTTransformerBlock,
     MixVisionTransformer,
+    SegFormerHead,
     
 ) 
