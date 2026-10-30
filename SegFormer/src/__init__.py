@@ -5,5 +5,5 @@ from .model import (
     MiTTransformerBlock,
     MixVisionTransformer,
     SegFormerHead,
-    
+    SegFormer
 ) 

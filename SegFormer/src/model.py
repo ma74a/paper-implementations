@@ -538,3 +538,54 @@ class SegFormerHead(nn.Module):
         x = self.linear_pred(x)
 
         return x
+    
+
+class SegFormer(nn.Module):
+    def __init__(
+        self,
+        num_classes: int,
+        embed_dims: Sequence[int] = (32, 64, 160, 256),
+        depths: Sequence[int] = (2, 2, 2, 2),
+        num_heads: Sequence[int] = (1, 2, 5, 8),
+        sr_ratios: Sequence[int] = (8, 4, 2, 1),
+        mlp_ratios: Sequence[int] = (4, 4, 4, 4),
+        patch_kernels: Sequence[int] = (7, 3, 3, 3),
+        patch_strides: Sequence[int] = (4, 2, 2, 2),
+        patch_paddings: Sequence[int] = (3, 1, 1, 1),
+        drop_path_rate: float = 0.1,
+        decoder_dim: int = 256,
+        decoder_dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        self.encoder = MixVisionTransformer(
+            embed_dims=embed_dims,
+            depths=depths,
+            num_heads=num_heads,
+            sr_ratios=sr_ratios,
+            mlp_ratios=mlp_ratios,
+            patch_kernels=patch_kernels,
+            patch_strides=patch_strides,
+            patch_paddings=patch_paddings,
+            drop_path_rate=drop_path_rate,
+        )
+        self.decoder = SegFormerHead(
+            in_channels=embed_dims,
+            embed_dim=decoder_dim,
+            num_classes=num_classes,
+            dropout_rate=decoder_dropout,
+        )
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape -> [B, C, H, W]
+        # get the H, W
+        input_size = x.shape[2:]
+        
+        features = self.encoder(x)
+        logits = self.decoder(features)
+        
+        # upsampling the H, W
+        # Bilinear x4 back to input size so the loss and mIoU use full-size labels.
+        logits = F.interpolate(logits, size=input_size, mode="bilinear", align_corners=False)
+        
+        # shape -> [B, num_classes, H, W]
+        return logits
