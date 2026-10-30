@@ -7,7 +7,7 @@ from src import (
     MiTTransformerBlock,
     MixVisionTransformer,
     SegFormerHead,
-    
+    SegFormer
 )
 
 
@@ -141,6 +141,23 @@ def test_segformer_head():
 
     print(logits.shape)
     # torch.Size([2, 19, 128, 128])
+    
+def test_segformer_model():
+    model = SegFormer(num_classes=19)
+
+    image = torch.randn(2, 3, 512, 512)
+
+    model.eval()
+
+    with torch.no_grad():
+        logits = model(image)
+
+    print("Input:", image.shape)
+    print("Output:", logits.shape)
+
+    predictions = logits.argmax(dim=1)
+
+    print("Predictions:", predictions.shape)
 
 
 if __name__ == "__main__":
@@ -152,7 +169,9 @@ if __name__ == "__main__":
     test_mixfnn()
     print("\nTest mix transformer block: ")
     test_mit_block(patch_embed)
-    print("\n Test test_mix_vision_transformer: ")
+    print("\nTest test_mix_vision_transformer: ")
     test_mix_vision_transformer()
-    print("\n test segform head")
+    print("\ntest segform head")
     test_segformer_head()
+    print("\nTest segformer model")
+    test_segformer_model()
