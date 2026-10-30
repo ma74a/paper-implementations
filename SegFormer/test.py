@@ -6,6 +6,7 @@ from src import (
     MixFFN,
     MiTTransformerBlock,
     MixVisionTransformer,
+    SegFormerHead,
     
 )
 
@@ -122,7 +123,24 @@ def test_mix_vision_transformer():
     # ]
 
 
+def test_segformer_head():
+    decoder = SegFormerHead(
+        in_channels=(32, 64, 160, 256),
+        embed_dim=256,
+        num_classes=19,
+    )
 
+    features = [
+        torch.randn(2, 32, 128, 128),   # Stage 1: stride 4
+        torch.randn(2, 64, 64, 64),     # Stage 2: stride 8
+        torch.randn(2, 160, 32, 32),    # Stage 3: stride 16
+        torch.randn(2, 256, 16, 16),    # Stage 4: stride 32
+    ]
+
+    logits = decoder(features)
+
+    print(logits.shape)
+    # torch.Size([2, 19, 128, 128])
 
 
 if __name__ == "__main__":
@@ -136,3 +154,5 @@ if __name__ == "__main__":
     test_mit_block(patch_embed)
     print("\n Test test_mix_vision_transformer: ")
     test_mix_vision_transformer()
+    print("\n test segform head")
+    test_segformer_head()
