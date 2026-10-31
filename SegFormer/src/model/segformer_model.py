@@ -589,3 +589,5 @@ class SegFormer(nn.Module):
         
         # shape -> [B, num_classes, H, W]
         return logits
+    
+    
