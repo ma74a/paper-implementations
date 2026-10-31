@@ -28,6 +28,25 @@ Not every implementation is a full reproduction of the paper's reported results.
 
 Additional libraries may vary by implementation.
 
+## Implemented Papers
+ 
+| Status | Paper | Authors | Year | Task | Code |
+|:------:|-------|---------|:----:|------|:----:|
+| ✅ | [ImageNet Classification with Deep Convolutional Neural Networks (AlexNet)](https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html) | Krizhevsky, Sutskever, Hinton | 2012 | Image Classification | [AlexNet](./AlexNet) |
+| ✅ | [U-Net: Convolutional Networks for Biomedical Image Segmentation](https://arxiv.org/abs/1505.04597) | Ronneberger, Fischer, Brox | 2015 | Semantic Segmentation | [U-Net](./U-Net) |
+| ✅ | [Deep Residual Learning for Image Recognition (ResNet)](https://arxiv.org/abs/1512.03385) | He, Zhang, Ren, Sun | 2015 | Image Classification | [ResNet](./ResNet) |
+| ✅ | [You Only Look Once: Unified, Real-Time Object Detection (YOLOv1)](https://arxiv.org/abs/1506.02640) | Redmon, Divvala, Girshick, Farhadi | 2015 | Object Detection | [yolo-v1](./yolo-v1) |
+| ✅ | [An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale (ViT)](https://arxiv.org/abs/2010.11929) | Dosovitskiy et al. | 2020 | Image Classification | [ViT](./ViT) |
+| ✅ | [Learning Transferable Visual Models From Natural Language Supervision (CLIP)](https://arxiv.org/abs/2103.00020) | Radford et al. | 2021 | Vision-Language Learning | [CLIP](./CLIP) |
+ 
+### Up Next
+ 
+| Status | Paper | Task |
+|:------:|-------|------|
+| 🔜 | [SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers](https://arxiv.org/abs/2105.15203) | Semantic Segmentation |
+ 
+**Legend:** ✅ Implemented · 🚧 In progress · 🔜 Planned
+
 ## Author
 
 **Mahmoud Etman**
