@@ -1,13 +1,12 @@
-
 from torch.utils.data import DataLoader
 
 from typing import Tuple
-from omegaconf import OmegaConf
+from omegaconf import DictConfig
 
 from .transforms import TrainTransform, ValTransform
 from .dataset import VOC2012Segmentation
 
-def get_data(cfg: OmegaConf) -> Tuple[DataLoader, DataLoader]:
+def get_data(cfg) -> Tuple[DataLoader, DataLoader]:
     train_transform = TrainTransform()
     val_transform = ValTransform()
     
