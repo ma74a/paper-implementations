@@ -1,0 +1,39 @@
+data:
+  root: /home/etman/Downloads/voc_subset           # folder you unzipped
+  train_split: train.txt
+  val_split: val.txt
+  in_channels: 3
+  num_classes: 21             # 20 objects + background
+  ignore_index: 255           # VOC boundary pixels
+  img_size: 512
+  crop_size: 512
+  scale_range: [0.5, 2.0]     # random resize
+  num_workers: 2
+
+model:
+  name: segformer-b0
+  pretrained: nvidia/mit-b0   # ImageNet-pretrained encoder
+
+  # MiT-B0 encoder (4 stages)
+  hidden_sizes: [32, 64, 160, 256]   # channels per stage
+  depths: [2, 2, 2, 2]               # transformer blocks per stage
+  num_attention_heads: [1, 2, 5, 8]
+  sr_ratios: [8, 4, 2, 1]            # attention sequence reduction
+  patch_sizes: [7, 3, 3, 3]          # overlapping patch embedding kernel
+  strides: [4, 2, 2, 2]
+  mlp_ratios: [4, 4, 4, 4]           # Mix-FFN expansion
+  drop_path_rate: 0.1
+
+  # All-MLP decoder
+  decoder_hidden_size: 256
+  classifier_dropout: 0.1
+
+train:
+  epochs: 50
+  batch_size: 16
+  lr: 0.00006
+  weight_decay: 0.01
+  warmup_start_factor: 1.0
+  power: 0.9
+  seed: 42
+  save_dir: checkpoints
