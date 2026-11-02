@@ -46,7 +46,7 @@ def main():
    
     
     logger.info("Dataset creation begin")
-    train_dataset, val_dataset, train_loader, val_loader = get_data(cfg=config)
+    train_loader, val_loader = get_data(cfg=config)
     logger.info("Dataset created")
     
     logger.info("Model Creation Begin")
