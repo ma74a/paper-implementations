@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
+import os
 from typing import List
 import numpy as np
 from pathlib import Path
@@ -140,5 +141,93 @@ def plot_confusion_matrix(
 
     if show:
         plt.show()
+
+    plt.close(fig)
+
+
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+
+def plot_training_history(
+    train_losses: list[float],
+    val_losses: list[float],
+    val_mious: list[float],
+    save_dir: str | Path,
+) -> None:
+    """
+    Plot and save training history.
+
+    Creates three plots:
+        1. Training Loss
+        2. Validation Loss
+        3. Validation mIoU
+
+    Args:
+        train_losses: Training loss per epoch.
+        val_losses: Validation loss per epoch.
+        val_mious: Validation mIoU per epoch.
+        save_dir: Directory to save the figure.
+    """
+
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    epochs = range(1, len(train_losses) + 1)
+
+    fig, axes = plt.subplots(
+        nrows=3,
+        ncols=1,
+        figsize=(12, 15),
+    )
+
+    # Training Loss
+    axes[0].plot(
+        epochs,
+        train_losses,
+        label="Training Loss",
+        linewidth=2,
+    )
+    axes[0].set_title("Training Loss")
+    axes[0].set_xlabel("Epoch")
+    axes[0].set_ylabel("Loss")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    # Validation Loss
+    axes[1].plot(
+        epochs,
+        val_losses,
+        label="Validation Loss",
+        linewidth=2,
+    )
+    axes[1].set_title("Validation Loss")
+    axes[1].set_xlabel("Epoch")
+    axes[1].set_ylabel("Loss")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+
+    # Validation mIoU
+    axes[2].plot(
+        epochs,
+        val_mious,
+        label="Validation mIoU",
+        linewidth=2,
+    )
+    axes[2].set_title("Validation mIoU")
+    axes[2].set_xlabel("Epoch")
+    axes[2].set_ylabel("mIoU")
+    axes[2].grid(True, alpha=0.3)
+    axes[2].legend()
+
+    plt.tight_layout()
+
+    save_path = save_dir / "training_history.png"
+
+    plt.savefig(
+        save_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
 
     plt.close(fig)
