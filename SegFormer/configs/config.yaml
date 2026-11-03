@@ -9,6 +9,28 @@ data:
   crop_size: 512
   scale_range: [0.5, 2.0]     # random resize
   num_workers: 2
+  class_names: [
+    "background",
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor"]
 
 model:
   name: segformer-b0
@@ -29,7 +51,7 @@ model:
   classifier_dropout: 0.1
 
 train:
-  epochs: 50
+  epochs: 1
   batch_size: 16
   lr: 0.00006
   weight_decay: 0.01
