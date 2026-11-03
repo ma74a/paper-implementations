@@ -7,6 +7,9 @@ dependencies = [
     "torchaudio>=2.11.0",
     "torchvision>=0.29.1",
     "timm",
+    "pandas>=2.3.3",
+    "torchinfo>=1.8.0",
+    "tqdm>=4.70.1",
 ]
 
 [[tool.uv.index]]
