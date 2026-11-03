@@ -10,6 +10,7 @@ dependencies = [
     "pandas>=2.3.3",
     "torchinfo>=1.8.0",
     "tqdm>=4.70.1",
+    "matplotlib>=3.10.9",
 ]
 
 [[tool.uv.index]]
