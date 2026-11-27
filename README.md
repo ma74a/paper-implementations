@@ -33,6 +33,7 @@ Additional libraries may vary by implementation.
 | Status | Paper | Authors | Year | Task | Code |
 |:------:|-------|---------|:----:|------|:----:|
 | ✅ | [ImageNet Classification with Deep Convolutional Neural Networks (AlexNet)](https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html) | Krizhevsky, Sutskever, Hinton | 2012 | Image Classification | [AlexNet](./AlexNet) |
+| ✅ | [Auto-Encoding Variational Bayes (VAE)](https://arxiv.org/abs/1312.6114) | Kingma, Welling | 2013 | Generative Modeling | [VAE](./VAE) |
 | ✅ | [U-Net: Convolutional Networks for Biomedical Image Segmentation](https://arxiv.org/abs/1505.04597) | Ronneberger, Fischer, Brox | 2015 | Semantic Segmentation | [U-Net](./U-Net) |
 | ✅ | [Deep Residual Learning for Image Recognition (ResNet)](https://arxiv.org/abs/1512.03385) | He, Zhang, Ren, Sun | 2015 | Image Classification | [ResNet](./ResNet) |
 | ✅ | [You Only Look Once: Unified, Real-Time Object Detection (YOLOv1)](https://arxiv.org/abs/1506.02640) | Redmon, Divvala, Girshick, Farhadi | 2015 | Object Detection | [yolo-v1](./yolo-v1) |
